@@ -20,8 +20,6 @@ const userSchema = new mongoose.Schema({
         enum: ['student', 'warden', 'admin'],
         default: 'student',
     },
-    // References to Hostel and Room will be added once those models are created
-    // We keep them as fields for now to match requirements
     hostel: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Hostel',
@@ -32,7 +30,7 @@ const userSchema = new mongoose.Schema({
         ref: 'Room',
         default: null
     },
-    // Flexible profile object for role-specific details
+    
     profile: {
         mobileNumber: String,
         department: String,
@@ -50,7 +48,6 @@ const userSchema = new mongoose.Schema({
     timestamps: true,
 });
 
-// Middleware to hash password before saving
 userSchema.pre('save', async function () {
     if (!this.isModified('password')) {
         return;
@@ -60,7 +57,7 @@ userSchema.pre('save', async function () {
     this.password = await bcrypt.hash(this.password, salt);
 });
 
-// Method to compare passwords
+
 userSchema.methods.matchPassword = async function (enteredPassword) {
     return await bcrypt.compare(enteredPassword, this.password);
 };
