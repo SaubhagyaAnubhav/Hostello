@@ -22,7 +22,7 @@ const startServer = async () => {
   app.use('/api/notices', noticeRoutes);
 
   app.listen(process.env.PORT || 5000, () =>
-    console.log("Server running 🚀")
+    console.log("Server running ")
   );
 };
 
