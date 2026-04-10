@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 import {
   AlertCircle,
   CheckCircle2,
@@ -12,7 +13,7 @@ import {
   Ticket,
   Trash2,
 } from "lucide-react";
-import { createComplaint, getMyComplaints,deleteComplaint } from "../../services/api";
+import { createComplaint, getMyComplaints, deleteComplaint } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 
 const categories = [
@@ -42,6 +43,10 @@ const priorityStyles = {
   High: "bg-rose-50 text-rose-700",
 };
 
+const COMPLAINTS_CACHE_KEY = "student_complaints_cache";
+const COMPLAINTS_CACHE_TIME_KEY = "student_complaints_cache_time";
+const COMPLAINTS_CACHE_TTL = 60 * 1000;
+
 const getComplaintRef = (item) => {
   const id = item?._id ? String(item._id).slice(-6).toUpperCase() : "NEW001";
   return `CMP-${id}`;
@@ -67,11 +72,42 @@ const formatDateTime = (value) => {
   }).format(new Date(value));
 };
 
+const readCachedComplaints = () => {
+  try {
+    const value = sessionStorage.getItem(COMPLAINTS_CACHE_KEY);
+    return value ? JSON.parse(value) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveComplaintsCache = (items) => {
+  sessionStorage.setItem(COMPLAINTS_CACHE_KEY, JSON.stringify(items));
+  sessionStorage.setItem(COMPLAINTS_CACHE_TIME_KEY, Date.now().toString());
+};
+
+const isComplaintsCacheFresh = () => {
+  const lastFetchTime = Number(sessionStorage.getItem(COMPLAINTS_CACHE_TIME_KEY) || 0);
+  return Date.now() - lastFetchTime < COMPLAINTS_CACHE_TTL;
+};
+
+const getComplaintArray = (response) => {
+  if (Array.isArray(response)) return response;
+  if (Array.isArray(response?.complaints)) return response.complaints;
+  if (Array.isArray(response?.data)) return response.data;
+  return [];
+};
+
 export default function ComplaintsPage() {
   const { user } = useAuth();
+  const location = useLocation();
   const historyRef = useRef(null);
   const successTimer = useRef(null);
   const errorTimer = useRef(null);
+
+  const prefetchedComplaints = location.state?.prefetchedComplaints || [];
+  const initialComplaints =
+    prefetchedComplaints.length > 0 ? prefetchedComplaints : readCachedComplaints();
 
   const [formData, setFormData] = useState({
     name: user?.name || "",
@@ -84,9 +120,9 @@ export default function ComplaintsPage() {
     priority: "Medium",
   });
 
-  const [complaints, setComplaints] = useState([]);
+  const [complaints, setComplaints] = useState(initialComplaints);
   const [loading, setLoading] = useState(false);
-  const [fetching, setFetching] = useState(true);
+  const [fetching, setFetching] = useState(initialComplaints.length === 0);
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
   const [fetchError, setFetchError] = useState("");
@@ -94,12 +130,22 @@ export default function ComplaintsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [deletingId, setDeletingId] = useState(null);
 
-  const fetchComplaints = async () => {
+  const fetchComplaints = async (force = false) => {
     try {
-      setFetching(true);
       setFetchError("");
-      const data = await getMyComplaints();
-      setComplaints(Array.isArray(data) ? data : []);
+
+      if (!force && complaints.length > 0 && isComplaintsCacheFresh()) {
+        setFetching(false);
+        return;
+      }
+
+      setFetching(true);
+
+      const response = await getMyComplaints();
+      const items = getComplaintArray(response);
+
+      setComplaints(items);
+      saveComplaintsCache(items);
     } catch (err) {
       setFetchError(err?.response?.data?.message || "Failed to load complaints.");
     } finally {
@@ -108,6 +154,13 @@ export default function ComplaintsPage() {
   };
 
   useEffect(() => {
+    if (prefetchedComplaints.length > 0) {
+      saveComplaintsCache(prefetchedComplaints);
+      setComplaints(prefetchedComplaints);
+      setFetching(false);
+      return;
+    }
+
     fetchComplaints();
   }, []);
 
@@ -165,7 +218,15 @@ export default function ComplaintsPage() {
         priority: "Medium",
       }));
 
-      await fetchComplaints();
+      if (createdComplaint) {
+        setComplaints((prev) => {
+          const updated = [createdComplaint, ...prev];
+          saveComplaintsCache(updated);
+          return updated;
+        });
+      } else {
+        await fetchComplaints(true);
+      }
 
       requestAnimationFrame(() => {
         historyRef.current?.scrollIntoView({
@@ -188,36 +249,41 @@ export default function ComplaintsPage() {
   };
 
   const handleDeleteComplaint = async (id) => {
-  const confirmed = window.confirm(
-    "Are you sure you want to delete this complaint? You can only delete pending complaints."
-  );
-
-  if (!confirmed) return;
-
-  try {
-    setDeletingId(id);
-    setError("");
-    setSuccess("");
-
-    const res = await deleteComplaint(id);
-
-    setComplaints((prev) => prev.filter((item) => item._id !== id));
-    setSuccess(res?.message || "Complaint deleted successfully.");
-
-    clearTimeout(successTimer.current);
-    successTimer.current = setTimeout(() => setSuccess(""), 5000);
-  } catch (err) {
-    setError(
-      err?.response?.data?.message ||
-        err?.message ||
-        "Failed to delete complaint."
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this complaint? You can only delete pending complaints."
     );
 
-    clearTimeout(errorTimer.current);
-    errorTimer.current = setTimeout(() => setError(""), 5000);
-  } finally {
-    setDeletingId(null);
-  }
+    if (!confirmed) return;
+
+    try {
+      setDeletingId(id);
+      setError("");
+      setSuccess("");
+
+      const res = await deleteComplaint(id);
+
+      setComplaints((prev) => {
+        const updated = prev.filter((item) => item._id !== id);
+        saveComplaintsCache(updated);
+        return updated;
+      });
+
+      setSuccess(res?.message || "Complaint deleted successfully.");
+
+      clearTimeout(successTimer.current);
+      successTimer.current = setTimeout(() => setSuccess(""), 5000);
+    } catch (err) {
+      setError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Failed to delete complaint."
+      );
+
+      clearTimeout(errorTimer.current);
+      errorTimer.current = setTimeout(() => setError(""), 5000);
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const summary = useMemo(() => {
@@ -624,7 +690,7 @@ export default function ComplaintsPage() {
               <span className="flex-1 text-sm">{fetchError}</span>
               <button
                 type="button"
-                onClick={fetchComplaints}
+                onClick={() => fetchComplaints(true)}
                 className="inline-flex items-center gap-2 text-sm font-semibold underline underline-offset-2 hover:text-rose-900"
               >
                 <RefreshCcw className="h-4 w-4" />
@@ -724,29 +790,29 @@ export default function ComplaintsPage() {
                     </div>
 
                     <div className="flex flex-col items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 lg:min-w-[210px] lg:items-end">
-                    <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                      Submitted on
-                    </p>
-                    <p className="mt-2 font-medium text-slate-800">
-                      {formatDate(item.createdAt)}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {formatDateTime(item.createdAt)}
-                    </p>
-                    </div>
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                          Submitted on
+                        </p>
+                        <p className="mt-2 font-medium text-slate-800">
+                          {formatDate(item.createdAt)}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {formatDateTime(item.createdAt)}
+                        </p>
+                      </div>
 
-                    {item.status === "Pending" && (
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteComplaint(item._id)}
-                      disabled={deletingId === item._id}
-                      className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-70"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      {deletingId === item._id ? "Deleting..." : "Delete"}
-                    </button>
-                    )}
+                      {item.status === "Pending" && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteComplaint(item._id)}
+                          disabled={deletingId === item._id}
+                          className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-70"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          {deletingId === item._id ? "Deleting..." : "Delete"}
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
