@@ -18,6 +18,26 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { getMyComplaints, getStudentNotices } from '../../services/api';
 
+const DASHBOARD_NOTICES_CACHE = 'dashboard_notices_cache';
+const DASHBOARD_NOTICES_CACHE_TIME = 'dashboard_notices_cache_time';
+const DASHBOARD_COMPLAINTS_CACHE = 'dashboard_complaints_cache';
+const DASHBOARD_COMPLAINTS_CACHE_TIME = 'dashboard_complaints_cache_time';
+const CACHE_TTL = 60 * 1000;
+
+const readCachedArray = (key) => {
+  try {
+    const value = sessionStorage.getItem(key);
+    return value ? JSON.parse(value) : [];
+  } catch {
+    return [];
+  }
+};
+
+const isCacheFresh = (timeKey) => {
+  const lastFetchTime = Number(sessionStorage.getItem(timeKey) || 0);
+  return Date.now() - lastFetchTime < CACHE_TTL;
+};
+
 const SectionHeader = ({
   title,
   description,
@@ -86,13 +106,42 @@ const EmptyState = ({ icon: Icon, title, description, accent = 'blue' }) => {
   );
 };
 
+const NoticePanelSkeleton = () => (
+  <div className="animate-pulse rounded-[22px] border border-slate-200 bg-slate-50 p-5">
+    <div className="h-4 w-20 rounded bg-slate-200" />
+    <div className="mt-3 h-6 w-2/3 rounded bg-slate-200" />
+    <div className="mt-4 h-4 w-full rounded bg-slate-200" />
+    <div className="mt-2 h-4 w-5/6 rounded bg-slate-200" />
+    <div className="mt-5 h-14 rounded-2xl bg-slate-200" />
+  </div>
+);
+
+const ComplaintPanelSkeleton = () => (
+  <div className="space-y-3">
+    {[1, 2].map((item) => (
+      <div
+        key={item}
+        className="animate-pulse rounded-[20px] border border-slate-200 bg-slate-50 p-4"
+      >
+        <div className="h-4 w-40 rounded bg-slate-200" />
+        <div className="mt-2 h-3 w-24 rounded bg-slate-200" />
+      </div>
+    ))}
+  </div>
+);
+
 const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [notices, setNotices] = useState([]);
-  const [complaints, setComplaints] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [notices, setNotices] = useState(() => readCachedArray(DASHBOARD_NOTICES_CACHE));
+  const [complaints, setComplaints] = useState(() => readCachedArray(DASHBOARD_COMPLAINTS_CACHE));
+  const [noticesLoading, setNoticesLoading] = useState(
+    () => readCachedArray(DASHBOARD_NOTICES_CACHE).length === 0
+  );
+  const [complaintsLoading, setComplaintsLoading] = useState(
+    () => readCachedArray(DASHBOARD_COMPLAINTS_CACHE).length === 0
+  );
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
 
@@ -163,43 +212,74 @@ const Dashboard = () => {
   };
 
   const fetchDashboardData = async (isRefresh = false) => {
-    try {
-      if (isRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
+    const requests = [];
 
+    try {
+      if (isRefresh) setRefreshing(true);
       setError('');
 
-      const [noticesRes, complaintsRes] = await Promise.allSettled([
-        getStudentNotices(),
-        getMyComplaints(),
-      ]);
+      const shouldUseNoticeCache = !isRefresh && isCacheFresh(DASHBOARD_NOTICES_CACHE_TIME);
+      const shouldUseComplaintCache = !isRefresh && isCacheFresh(DASHBOARD_COMPLAINTS_CACHE_TIME);
 
-      const noticesData =
-        noticesRes.status === 'fulfilled'
-          ? getArrayData(noticesRes.value, ['notices'])
-          : [];
+      if (shouldUseNoticeCache) {
+        setNotices(readCachedArray(DASHBOARD_NOTICES_CACHE));
+        setNoticesLoading(false);
+      } else {
+        setNoticesLoading(true);
 
-      const complaintsData =
-        complaintsRes.status === 'fulfilled'
-          ? getArrayData(complaintsRes.value, ['complaints'])
-          : [];
+        const noticeRequest = getStudentNotices()
+          .then((res) => {
+            const data = getArrayData(res, ['notices']);
+            setNotices(data);
+            sessionStorage.setItem(DASHBOARD_NOTICES_CACHE, JSON.stringify(data));
+            sessionStorage.setItem(DASHBOARD_NOTICES_CACHE_TIME, Date.now().toString());
+          })
+          .catch(() => {
+            setNotices([]);
+          })
+          .finally(() => {
+            setNoticesLoading(false);
+          });
 
-      setNotices(noticesData);
-      setComplaints(complaintsData);
+        requests.push(noticeRequest);
+      }
+
+      if (shouldUseComplaintCache) {
+        setComplaints(readCachedArray(DASHBOARD_COMPLAINTS_CACHE));
+        setComplaintsLoading(false);
+      } else {
+        setComplaintsLoading(true);
+
+        const complaintRequest = getMyComplaints()
+          .then((res) => {
+            const data = getArrayData(res, ['complaints']);
+            setComplaints(data);
+            sessionStorage.setItem(DASHBOARD_COMPLAINTS_CACHE, JSON.stringify(data));
+            sessionStorage.setItem(DASHBOARD_COMPLAINTS_CACHE_TIME, Date.now().toString());
+          })
+          .catch(() => {
+            setComplaints([]);
+          })
+          .finally(() => {
+            setComplaintsLoading(false);
+          });
+
+        requests.push(complaintRequest);
+      }
+
+      const results = await Promise.allSettled(requests);
 
       if (
-        noticesRes.status === 'rejected' &&
-        complaintsRes.status === 'rejected'
+        results.length > 0 &&
+        results.every((result) => result.status === 'rejected')
       ) {
         setError('Failed to load dashboard data.');
       }
     } catch (err) {
       setError(err?.response?.data?.message || 'Failed to load dashboard data.');
+      setNoticesLoading(false);
+      setComplaintsLoading(false);
     } finally {
-      setLoading(false);
       setRefreshing(false);
     }
   };
@@ -329,19 +409,27 @@ const Dashboard = () => {
 
   const activityItems = [
     {
-      title: latestNotice
+      title: noticesLoading
+        ? 'Loading latest hostel notice...'
+        : latestNotice
         ? latestNotice.title || latestNotice.subject || 'Latest hostel notice published'
         : 'No new notices published yet.',
-      meta: latestNotice
+      meta: noticesLoading
+        ? 'Notice feed'
+        : latestNotice
         ? `Notice · ${formatDate(latestNotice.createdAt || latestNotice.updatedAt)}`
         : 'Notice feed',
       tone: 'blue',
     },
     {
-      title: latestComplaint
+      title: complaintsLoading
+        ? 'Loading complaint updates...'
+        : latestComplaint
         ? latestComplaint.subject || latestComplaint.category || 'Latest complaint recorded'
         : 'No complaints submitted yet.',
-      meta: latestComplaint
+      meta: complaintsLoading
+        ? 'Complaint center'
+        : latestComplaint
         ? `${getComplaintStatusMeta(latestComplaint.status).label} · ${formatDate(
             latestComplaint.createdAt || latestComplaint.updatedAt
           )}`
@@ -360,35 +448,6 @@ const Dashboard = () => {
       tone: 'emerald',
     },
   ];
-
-  if (loading) {
-    return (
-      <div className="space-y-6 pb-8">
-        <section className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm md:p-8">
-          <div className="animate-pulse space-y-6">
-            <div className="h-5 w-40 rounded bg-slate-200" />
-            <div className="h-10 w-80 rounded bg-slate-200" />
-            <div className="h-4 w-full max-w-2xl rounded bg-slate-200" />
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              {[1, 2, 3, 4].map((item) => (
-                <div
-                  key={item}
-                  className="rounded-2xl border border-slate-200 bg-slate-50 p-5"
-                >
-                  <div className="space-y-3">
-                    <div className="h-4 w-24 rounded bg-slate-200" />
-                    <div className="h-8 w-20 rounded bg-slate-200" />
-                    <div className="h-3 w-32 rounded bg-slate-200" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6 bg-slate-50/70 pb-8">
@@ -517,7 +576,9 @@ const Dashboard = () => {
             iconClass="text-blue-600"
           />
 
-          {latestNotice ? (
+          {noticesLoading ? (
+            <NoticePanelSkeleton />
+          ) : latestNotice ? (
             <div className="rounded-[22px] border border-blue-100 bg-gradient-to-br from-blue-50/80 to-white p-5">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -579,7 +640,9 @@ const Dashboard = () => {
             iconClass="text-rose-600"
           />
 
-          {complaintPreview.length > 0 ? (
+          {complaintsLoading ? (
+            <ComplaintPanelSkeleton />
+          ) : complaintPreview.length > 0 ? (
             <div className="space-y-3">
               {complaintPreview.map((item) => {
                 const statusMeta = getComplaintStatusMeta(item.status);
