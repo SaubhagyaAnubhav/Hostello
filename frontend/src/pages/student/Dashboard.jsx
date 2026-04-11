@@ -841,7 +841,11 @@ const Dashboard = () => {
             </button>
 
             <button
-              onClick={() => navigate('/student/complaints')}
+              onClick={() =>
+                navigate('/student/complaints', {
+                  state: { prefetchedComplaints: complaints },
+                })
+              }
               className="group w-full rounded-[20px] border border-slate-200 bg-slate-50 p-4 text-left transition-all duration-200 hover:bg-white hover:shadow-sm"
             >
               <div className="flex items-start gap-3">
