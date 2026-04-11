@@ -18,13 +18,10 @@ const DashboardLayout = () => {
                 
                 <header className="md:hidden bg-white border-b border-gray-200 p-4 flex items-center justify-between sticky top-0 z-10">
                     <div className="flex items-center gap-2">
-                        <div className="bg-primary p-1.5 rounded-lg">
-                            <span className="text-white font-heading font-bold text-sm">H</span>
-                        </div>
-                        <span className="font-heading font-bold text-lg text-secondary">Hostello</span>
+                        <span className="font-sans text-2xl md:text-3xl font-black tracking-[-0.05em] sm:tracking-[-0.075em] text-transparent bg-clip-text bg-gradient-to-br from-primary via-blue-600 to-indigo-700 drop-shadow-sm group-hover:opacity-90 transition-opacity duration-300">Hostello</span>
                     </div>
                     <button className="text-slate-600">
-                        <Menu size={24} />
+                        <Menu size={26} />
                     </button>
                 </header>
 
