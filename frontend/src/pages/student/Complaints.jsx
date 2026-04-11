@@ -43,8 +43,8 @@ const priorityStyles = {
   High: "bg-rose-50 text-rose-700",
 };
 
-const COMPLAINTS_CACHE_KEY = "student_complaints_cache";
-const COMPLAINTS_CACHE_TIME_KEY = "student_complaints_cache_time";
+const COMPLAINTS_CACHE_KEY = "dashboard_complaints_cache";
+const COMPLAINTS_CACHE_TIME_KEY = "dashboard_complaints_cache_time";
 const COMPLAINTS_CACHE_TTL = 60 * 1000;
 
 const getComplaintRef = (item) => {
