@@ -21,8 +21,10 @@ const DashboardLayout = () => {
                     </div>
 
                     <button
-                        className="text-slate-600"
-                        onClick={() => setMobileOpen((prev) => !prev)}
+                        className="md:hidden"
+                        onClick={() => setMobileOpen(!mobileOpen)}
+                        aria-label={mobileOpen ? "Close navigation" : "Open navigation"}
+                        aria-expanded={mobileOpen}
                     >
                         {mobileOpen ? <X size={26} /> : <Menu size={26} />}
                     </button>
