@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { BellRing, Pin, CalendarDays, AlertTriangle, RefreshCcw } from 'lucide-react';
 import { getStudentNotices } from '../../services/api';
 
@@ -92,8 +92,11 @@ const Notices = () => {
   const [loading, setLoading] = useState(notices.length === 0);
   const [isBackgroundUpdating, setIsBackgroundUpdating] = useState(false);
   const [error, setError] = useState('');
+  const fetchLock = useRef(false);
 
   const fetchNotices = async (isManualRetry = false) => {
+    if (fetchLock.current && !isManualRetry) return;
+
     try {
       const lastFetchTime = Number(sessionStorage.getItem(CACHE_TIME_KEY) || 0);
       const isCacheFresh = Date.now() - lastFetchTime < CACHE_TTL;
@@ -101,6 +104,8 @@ const Notices = () => {
       if (!isManualRetry && notices.length > 0 && isCacheFresh) {
         return;
       }
+
+      fetchLock.current = true;
 
       if (notices.length === 0 || isManualRetry) {
         setLoading(true);
@@ -121,6 +126,7 @@ const Notices = () => {
     } finally {
       setLoading(false);
       setIsBackgroundUpdating(false);
+      fetchLock.current = false;
     }
   };
 
