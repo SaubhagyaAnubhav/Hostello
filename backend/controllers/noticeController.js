@@ -33,10 +33,14 @@ export const getStudentNotices = async (req, res) => {
       audience: { $in: ['All', studentHostel] },
     })
       .sort({ pinned: -1, createdAt: -1 })
-      .populate('createdBy', 'name');
+      .select('title message category priority pinned audience createdAt createdBy')
+      .populate('createdBy', 'name')
+      .limit(20)
+      .lean();
 
     res.status(200).json(notices);
   } catch (error) {
+    console.error('Get Student Notices Error:', error);
     res.status(500).json({ message: 'Failed to fetch notices' });
   }
 };

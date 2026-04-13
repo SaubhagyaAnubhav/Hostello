@@ -44,4 +44,6 @@ const noticeSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+noticeSchema.index({ isPublished: 1, audience: 1, pinned: -1, createdAt: -1 });
+
 export default mongoose.model('Notice', noticeSchema);

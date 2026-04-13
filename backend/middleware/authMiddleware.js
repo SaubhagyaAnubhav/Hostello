@@ -10,27 +10,27 @@ export const protect = async (req, res, next) => {
 
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-      req.user = await User.findById(decoded.id).select("-password");
+      req.user = await User.findById(decoded.id)
+        .select('_id role profile.hostelName')
+        .lean();
 
       if (!req.user) {
         return res.status(401).json({ message: "User not found." });
       }
 
-      next();
+      return next();
     } catch (error) {
       console.error("Protect Middleware Error:", error);
       return res.status(401).json({ message: "Not authorized, token failed." });
     }
   }
 
-  if (!token) {
-    return res.status(401).json({ message: "Not authorized, no token." });
-  }
+  return res.status(401).json({ message: "Not authorized, no token." });
 };
 
 export const adminOnly = (req, res, next) => {
   if (req.user && req.user.role === "admin") {
-    next();
+    return next();
   } else {
     return res.status(403).json({ message: "Access denied. Admin only." });
   }
