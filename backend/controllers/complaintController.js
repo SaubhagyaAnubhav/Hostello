@@ -42,9 +42,9 @@ export const createComplaint = async (req, res) => {
 
 export const getMyComplaints = async (req, res) => {
   try {
-    const complaints = await Complaint.find({ student: req.user._id }).sort({
-      createdAt: -1,
-    });
+    const complaints = await Complaint.find({ student: req.user._id })
+      .sort({ createdAt: -1 })
+      .lean();
 
     res.status(200).json(complaints);
   } catch (error) {

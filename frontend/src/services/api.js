@@ -44,9 +44,14 @@ export const createComplaint = async (complaintData) => {
   return data;
 };
 
+let complaintsPromise = null;
 export const getMyComplaints = async () => {
-  const { data } = await api.get("/complaints/my");
-  return data;
+    if (!complaintsPromise) {
+        complaintsPromise = api.get("/complaints/my").then(res => res.data).finally(() => {
+            setTimeout(() => { complaintsPromise = null; }, 2000); 
+        });
+    }
+    return complaintsPromise;
 };
 
 export const getAllComplaints = async () => {
@@ -62,9 +67,15 @@ export const deleteComplaint = async (id) => {
   const { data } = await api.delete(`/complaints/${id}`);
   return data;
 };
+
+let noticesPromise = null;
 export const getStudentNotices = async () => {
-  const { data } = await api.get('/notices/student');
-  return data;
+    if (!noticesPromise) {
+        noticesPromise = api.get('/notices/student').then(res => res.data).finally(() => {
+            setTimeout(() => { noticesPromise = null; }, 2000); // Clear after 2s
+        });
+    }
+    return noticesPromise;
 };
 
 export const getAllNotices = async () => {
