@@ -18,25 +18,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { getMyComplaints, getStudentNotices } from '../../services/api';
 
-const DASHBOARD_NOTICES_CACHE = 'dashboard_notices_cache';
-const DASHBOARD_NOTICES_CACHE_TIME = 'dashboard_notices_cache_time';
-const DASHBOARD_COMPLAINTS_CACHE = 'dashboard_complaints_cache';
-const DASHBOARD_COMPLAINTS_CACHE_TIME = 'dashboard_complaints_cache_time';
-const CACHE_TTL = 60 * 1000;
-
-const readCachedArray = (key) => {
-  try {
-    const value = sessionStorage.getItem(key);
-    return value ? JSON.parse(value) : [];
-  } catch {
-    return [];
-  }
-};
-
-const isCacheFresh = (timeKey) => {
-  const lastFetchTime = Number(sessionStorage.getItem(timeKey) || 0);
-  return Date.now() - lastFetchTime < CACHE_TTL;
-};
+// Global API cache handled internally by api.js
 
 const SectionHeader = ({
   title,
@@ -134,14 +116,10 @@ const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [notices, setNotices] = useState(() => readCachedArray(DASHBOARD_NOTICES_CACHE));
-  const [complaints, setComplaints] = useState(() => readCachedArray(DASHBOARD_COMPLAINTS_CACHE));
-  const [noticesLoading, setNoticesLoading] = useState(
-    () => readCachedArray(DASHBOARD_NOTICES_CACHE).length === 0
-  );
-  const [complaintsLoading, setComplaintsLoading] = useState(
-    () => readCachedArray(DASHBOARD_COMPLAINTS_CACHE).length === 0
-  );
+  const [notices, setNotices] = useState([]);
+  const [complaints, setComplaints] = useState([]);
+  const [noticesLoading, setNoticesLoading] = useState(true);
+  const [complaintsLoading, setComplaintsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
 
@@ -212,74 +190,35 @@ const Dashboard = () => {
   };
 
   const fetchDashboardData = async (isRefresh = false) => {
-    const requests = [];
-
     try {
       if (isRefresh) setRefreshing(true);
       setError('');
 
-      const shouldUseNoticeCache = !isRefresh && isCacheFresh(DASHBOARD_NOTICES_CACHE_TIME);
-      const shouldUseComplaintCache = !isRefresh && isCacheFresh(DASHBOARD_COMPLAINTS_CACHE_TIME);
+      setNoticesLoading(true);
+      setComplaintsLoading(true);
 
-      if (shouldUseNoticeCache) {
-        setNotices(readCachedArray(DASHBOARD_NOTICES_CACHE));
-        setNoticesLoading(false);
+      const [noticesData, complaintsData] = await Promise.allSettled([
+        getStudentNotices(isRefresh),
+        getMyComplaints(isRefresh)
+      ]);
+
+      if (noticesData.status === 'fulfilled') {
+        setNotices(getArrayData(noticesData.value, ['notices']));
       } else {
-        setNoticesLoading(true);
-
-        const noticeRequest = getStudentNotices()
-          .then((res) => {
-            const data = getArrayData(res, ['notices']);
-            setNotices(data);
-            sessionStorage.setItem(DASHBOARD_NOTICES_CACHE, JSON.stringify(data));
-            sessionStorage.setItem(DASHBOARD_NOTICES_CACHE_TIME, Date.now().toString());
-          })
-          .catch(() => {
-            setNotices([]);
-          })
-          .finally(() => {
-            setNoticesLoading(false);
-          });
-
-        requests.push(noticeRequest);
+        setNotices([]);
       }
 
-      if (shouldUseComplaintCache) {
-        setComplaints(readCachedArray(DASHBOARD_COMPLAINTS_CACHE));
-        setComplaintsLoading(false);
+      if (complaintsData.status === 'fulfilled') {
+        setComplaints(getArrayData(complaintsData.value, ['complaints']));
       } else {
-        setComplaintsLoading(true);
-
-        const complaintRequest = getMyComplaints()
-          .then((res) => {
-            const data = getArrayData(res, ['complaints']);
-            setComplaints(data);
-            sessionStorage.setItem(DASHBOARD_COMPLAINTS_CACHE, JSON.stringify(data));
-            sessionStorage.setItem(DASHBOARD_COMPLAINTS_CACHE_TIME, Date.now().toString());
-          })
-          .catch(() => {
-            setComplaints([]);
-          })
-          .finally(() => {
-            setComplaintsLoading(false);
-          });
-
-        requests.push(complaintRequest);
+        setComplaints([]);
       }
 
-      const results = await Promise.allSettled(requests);
-
-      if (
-        results.length > 0 &&
-        results.every((result) => result.status === 'rejected')
-      ) {
-        setError('Failed to load dashboard data.');
-      }
     } catch (err) {
       setError(err?.response?.data?.message || 'Failed to load dashboard data.');
+    } finally {
       setNoticesLoading(false);
       setComplaintsLoading(false);
-    } finally {
       setRefreshing(false);
     }
   };
@@ -288,21 +227,9 @@ const Dashboard = () => {
     fetchDashboardData();
   }, []);
 
-  const sortedNotices = useMemo(() => {
-    return [...notices].sort(
-      (a, b) =>
-        new Date(b.createdAt || b.updatedAt || 0) -
-        new Date(a.createdAt || a.updatedAt || 0)
-    );
-  }, [notices]);
-
-  const sortedComplaints = useMemo(() => {
-    return [...complaints].sort(
-      (a, b) =>
-        new Date(b.createdAt || b.updatedAt || 0) -
-        new Date(a.createdAt || a.updatedAt || 0)
-    );
-  }, [complaints]);
+  const sortedNotices = notices; 
+  
+  const sortedComplaints = complaints;
 
   const latestNotice = sortedNotices[0] || null;
   const latestComplaint = sortedComplaints[0] || null;
