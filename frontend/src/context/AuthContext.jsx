@@ -26,6 +26,7 @@ const saveStoredUser = (user) => {
 const clearStoredAuth = () => {
   localStorage.removeItem('token');
   localStorage.removeItem(USER_STORAGE_KEY);
+  sessionStorage.clear();
 };
 
 const normalizeUser = (payload) => {
