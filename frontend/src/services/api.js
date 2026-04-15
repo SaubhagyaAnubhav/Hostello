@@ -45,10 +45,41 @@ export const createComplaint = async (complaintData) => {
 };
 
 let complaintsPromise = null;
-export const getMyComplaints = async () => {
+
+const CACHE_TTL = 300 * 1000; 
+
+const getCachedData = (key) => {
+    try {
+        const cached = sessionStorage.getItem(key);
+        if (!cached) return null;
+        const { data, timestamp } = JSON.parse(cached);
+        if (Date.now() - timestamp < CACHE_TTL) return data;
+    } catch {
+       
+    }
+    return null;
+};
+
+const setCachedData = (key, data) => {
+    try {
+        sessionStorage.setItem(key, JSON.stringify({ data, timestamp: Date.now() }));
+    } catch {
+       
+    }
+};
+
+export const getMyComplaints = async (force = false) => {
+    if (!force) {
+        const cached = getCachedData('global_complaints_cache');
+        if (cached) return cached;
+    }
+
     if (!complaintsPromise) {
-        complaintsPromise = api.get("/complaints/my").then(res => res.data).finally(() => {
-            setTimeout(() => { complaintsPromise = null; }, 2000); 
+        complaintsPromise = api.get("/complaints/my").then(res => {
+            setCachedData('global_complaints_cache', res.data);
+            return res.data;
+        }).finally(() => {
+            complaintsPromise = null;
         });
     }
     return complaintsPromise;
@@ -69,10 +100,18 @@ export const deleteComplaint = async (id) => {
 };
 
 let noticesPromise = null;
-export const getStudentNotices = async () => {
+export const getStudentNotices = async (force = false) => {
+    if (!force) {
+        const cached = getCachedData('global_notices_cache');
+        if (cached) return cached;
+    }
+
     if (!noticesPromise) {
-        noticesPromise = api.get('/notices/student').then(res => res.data).finally(() => {
-            setTimeout(() => { noticesPromise = null; }, 2000); // Clear after 2s
+        noticesPromise = api.get('/notices/student').then(res => {
+            setCachedData('global_notices_cache', res.data);
+            return res.data;
+        }).finally(() => {
+            noticesPromise = null;
         });
     }
     return noticesPromise;
