@@ -43,7 +43,9 @@ export const createComplaint = async (req, res) => {
 export const getMyComplaints = async (req, res) => {
   try {
     const complaints = await Complaint.find({ student: req.user._id })
+      .select("-__v")
       .sort({ createdAt: -1 })
+      .limit(50)
       .lean();
 
     res.status(200).json(complaints);
