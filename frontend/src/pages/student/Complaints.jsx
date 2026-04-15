@@ -43,6 +43,10 @@ const priorityStyles = {
   High: "bg-rose-50 text-rose-700",
 };
 
+const COMPLAINTS_CACHE_KEY = "dashboard_complaints_cache";
+const COMPLAINTS_CACHE_TIME_KEY = "dashboard_complaints_cache_time";
+const COMPLAINTS_CACHE_TTL = 60 * 1000;
+
 const getComplaintRef = (item) => {
   const id = item?._id ? String(item._id).slice(-6).toUpperCase() : "NEW001";
   return `CMP-${id}`;
@@ -68,6 +72,25 @@ const formatDateTime = (value) => {
   }).format(new Date(value));
 };
 
+const readCachedComplaints = () => {
+  try {
+    const value = sessionStorage.getItem(COMPLAINTS_CACHE_KEY);
+    return value ? JSON.parse(value) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveComplaintsCache = (items) => {
+  sessionStorage.setItem(COMPLAINTS_CACHE_KEY, JSON.stringify(items));
+  sessionStorage.setItem(COMPLAINTS_CACHE_TIME_KEY, Date.now().toString());
+};
+
+const isComplaintsCacheFresh = () => {
+  const lastFetchTime = Number(sessionStorage.getItem(COMPLAINTS_CACHE_TIME_KEY) || 0);
+  return Date.now() - lastFetchTime < COMPLAINTS_CACHE_TTL;
+};
+
 const getComplaintArray = (response) => {
   if (Array.isArray(response)) return response;
   if (Array.isArray(response?.complaints)) return response.complaints;
@@ -83,7 +106,8 @@ export default function ComplaintsPage() {
   const errorTimer = useRef(null);
 
   const prefetchedComplaints = location.state?.prefetchedComplaints || [];
-  const initialComplaints = prefetchedComplaints.length > 0 ? prefetchedComplaints : [];
+  const initialComplaints =
+    prefetchedComplaints.length > 0 ? prefetchedComplaints : readCachedComplaints();
 
   const [formData, setFormData] = useState({
     name: user?.name || "",
@@ -110,15 +134,18 @@ export default function ComplaintsPage() {
     try {
       setFetchError("");
 
-      if (!force && complaints.length > 0) {
-      } else {
-        setFetching(true);
+      if (!force && complaints.length > 0 && isComplaintsCacheFresh()) {
+        setFetching(false);
+        return;
       }
 
-      const response = await getMyComplaints(force);
+      setFetching(true);
+
+      const response = await getMyComplaints();
       const items = getComplaintArray(response);
 
       setComplaints(items);
+      saveComplaintsCache(items);
     } catch (err) {
       setFetchError(err?.response?.data?.message || "Failed to load complaints.");
     } finally {
@@ -128,6 +155,7 @@ export default function ComplaintsPage() {
 
   useEffect(() => {
     if (prefetchedComplaints.length > 0) {
+      saveComplaintsCache(prefetchedComplaints);
       setComplaints(prefetchedComplaints);
       setFetching(false);
       return;
@@ -193,10 +221,9 @@ export default function ComplaintsPage() {
       if (createdComplaint) {
         setComplaints((prev) => {
           const updated = [createdComplaint, ...prev];
+          saveComplaintsCache(updated);
           return updated;
         });
-  
-        getMyComplaints(true);
       } else {
         await fetchComplaints(true);
       }
@@ -237,10 +264,9 @@ export default function ComplaintsPage() {
 
       setComplaints((prev) => {
         const updated = prev.filter((item) => item._id !== id);
+        saveComplaintsCache(updated);
         return updated;
       });
-      
-      getMyComplaints(true);
 
       setSuccess(res?.message || "Complaint deleted successfully.");
 

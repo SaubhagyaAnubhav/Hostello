@@ -79,13 +79,17 @@ const NoticeCard = ({ notice }) => (
   </article>
 );
 
-const CACHE_KEY = 'hostel_notices_cache'; 
+const CACHE_KEY = 'hostel_notices_cache';
 const CACHE_TIME_KEY = 'hostel_notices_cache_time';
+const CACHE_TTL = 60 * 1000; // 1 minute
 
 const Notices = () => {
-  const [notices, setNotices] = useState([]);
+  const [notices, setNotices] = useState(() => {
+    const cachedData = sessionStorage.getItem(CACHE_KEY);
+    return cachedData ? JSON.parse(cachedData) : [];
+  });
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(notices.length === 0);
   const [isBackgroundUpdating, setIsBackgroundUpdating] = useState(false);
   const [error, setError] = useState('');
   const fetchLock = useRef(false);
@@ -94,6 +98,13 @@ const Notices = () => {
     if (fetchLock.current && !isManualRetry) return;
 
     try {
+      const lastFetchTime = Number(sessionStorage.getItem(CACHE_TIME_KEY) || 0);
+      const isCacheFresh = Date.now() - lastFetchTime < CACHE_TTL;
+
+      if (!isManualRetry && notices.length > 0 && isCacheFresh) {
+        return;
+      }
+
       fetchLock.current = true;
 
       if (notices.length === 0 || isManualRetry) {
@@ -102,9 +113,11 @@ const Notices = () => {
         setIsBackgroundUpdating(true);
       }
 
-      const data = await getStudentNotices(isManualRetry);
+      const data = await getStudentNotices();
 
       setNotices(data || []);
+      sessionStorage.setItem(CACHE_KEY, JSON.stringify(data || []));
+      sessionStorage.setItem(CACHE_TIME_KEY, Date.now().toString());
       setError('');
     } catch (err) {
       if (notices.length === 0) {
