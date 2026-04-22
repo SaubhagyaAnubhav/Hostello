@@ -76,10 +76,10 @@ const AppRoutes = () => {
                     <Route path="notices" element={<AdminNotices />} />
                     <Route path="verification" element={<AdminVerification />} />
                     <Route path="payments" element={<AdminPayments />} />
-                    <Route path="visitors" element={<div className="p-8 text-slate-500">Visitor Logs (Coming Soon)</div>} />
+                    {/* <Route path="visitors" element={<div className="p-8 text-slate-500">Visitor Logs (Coming Soon)</div>} />
                     <Route path="leaves" element={<div className="p-8 text-slate-500">Leaves / Gate Passes (Coming Soon)</div>} />
                     <Route path="reports" element={<div className="p-8 text-slate-500">Reports (Coming Soon)</div>} />
-                    <Route path="settings" element={<div className="p-8 text-slate-500">Settings (Coming Soon)</div>} />
+                    <Route path="settings" element={<div className="p-8 text-slate-500">Settings (Coming Soon)</div>} /> */}
                 </Route>
             </Route>
 

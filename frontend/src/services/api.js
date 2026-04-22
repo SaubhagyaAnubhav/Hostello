@@ -93,4 +93,9 @@ export const deleteNotice = async (id) => {
   return data;
 };
 
+export const getAdminDashboardStats = async () => {
+    const { data } = await api.get("/admin/dashboard-stats");
+    return data;
+  };
+
 export default api;

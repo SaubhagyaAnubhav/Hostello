@@ -36,10 +36,10 @@ const AdminSidebar = () => {
     { path: '/admin/notices', icon: Bell, label: 'Notices' },
     { path: '/admin/verification', icon: CheckSquare, label: 'Verification' },
     { path: '/admin/payments', icon: IndianRupee, label: 'Payments' },
-    { path: '/admin/visitors', icon: History, label: 'Visitor Logs' },
-    { path: '/admin/leaves', icon: UserX, label: 'Leaves / Passes' },
-    { path: '/admin/reports', icon: FileText, label: 'Reports' },
-    { path: '/admin/settings', icon: Settings, label: 'Settings' },
+    // { path: '/admin/visitors', icon: History, label: 'Visitor Logs' },
+    // { path: '/admin/leaves', icon: UserX, label: 'Leaves / Passes' },
+    // { path: '/admin/reports', icon: FileText, label: 'Reports' },
+    // { path: '/admin/settings', icon: Settings, label: 'Settings' },
   ];
 
   return (

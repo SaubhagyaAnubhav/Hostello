@@ -6,6 +6,7 @@ import connectDB from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
 import complaintRoutes from "./routes/complaintRoutes.js";
 import noticeRoutes from './routes/noticeRoutes.js';
+import adminRoutes from "./routes/adminRoutes.js";
 
 dotenv.config();
 
@@ -23,6 +24,7 @@ app.get("/", (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/complaints", complaintRoutes);
 app.use('/api/notices', noticeRoutes);
+app.use("/api/admin", adminRoutes);
 
 export default app;
 
