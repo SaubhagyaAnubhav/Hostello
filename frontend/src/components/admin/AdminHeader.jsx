@@ -1,72 +1,102 @@
-import React from 'react';
-import { Search, Bell, Plus, User } from 'lucide-react';
+import React, { useState } from 'react';
+import { Search, Bell, Plus, User, ChevronDown } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const AdminHeader = () => {
-    const { user } = useAuth();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [searchQuery, setSearchQuery] = useState('');
 
-    return (
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 md:px-8 shrink-0 sticky top-0 z-30">
+  const handleSearch = () => {
+    const query = searchQuery.trim();
+    if (!query) return;
+    navigate(`/admin/students?search=${encodeURIComponent(query)}`);
+  };
 
-            <div className="flex items-center md:hidden w-10"></div>
-            
-            
-            <div className="hidden md:flex items-center font-semibold text-slate-800 text-lg">
-                Admin Portal
+  const handleCreateNotice = () => {
+    navigate('/admin/notices');
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
+  };
+
+  return (
+    <header className="sticky top-0 z-30 h-16 border-b border-slate-200/80 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+      <div className="flex h-full items-center justify-between gap-4 px-4 md:px-6 lg:px-8">
+        <div className="flex min-w-0 flex-1 items-center">
+          <div className="hidden md:flex w-full max-w-md lg:max-w-lg relative">
+            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+              <Search size={18} />
             </div>
 
-           
-            <div className="flex items-center gap-4 sm:gap-6 ml-auto">
-                
-                
-                <div className="hidden sm:flex relative group">
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400 group-focus-within:text-indigo-500 transition-colors">
-                        <Search size={18} />
-                    </div>
-                    <input 
-                        type="text" 
-                        placeholder="Search students, rooms..."
-                        className="pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white w-64 transition-all"
-                    />
-                </div>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Search students, rooms, complaints..."
+              className="h-11 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm text-slate-700 placeholder:text-slate-400 outline-none transition-all focus:border-indigo-300 focus:bg-white focus:ring-4 focus:ring-indigo-500/10"
+            />
+          </div>
+        </div>
 
-                
-                <button className="hidden sm:flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-                    <Plus size={16} />
-                    <span>Create Notice</span>
-                </button>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <button
+            onClick={handleSearch}
+            className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 shadow-sm transition-all hover:border-slate-300 hover:bg-slate-50 sm:hidden"
+          >
+            <Search size={18} />
+          </button>
 
-                
-                <button className="relative p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 rounded-full transition-colors">
-                    <Bell size={20} />
-                    
-                    <span className="absolute top-1.5 right-1.5 flex h-2.5 w-2.5">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500 border-2 border-white"></span>
-                    </span>
-                </button>
+          <button
+            onClick={handleCreateNotice}
+            className="inline-flex h-10 items-center justify-center rounded-xl bg-indigo-600 px-3 text-sm font-medium text-white shadow-sm transition-all hover:bg-indigo-700 sm:hidden"
+          >
+            <Plus size={18} />
+          </button>
 
-                
-                <div className="flex items-center gap-3 pl-4 border-l border-slate-200">
-                    <div className="flex flex-col text-right hidden lg:flex mt-0.5">
-                        <span className="text-sm font-semibold text-slate-900 leading-tight">
-                            {user?.name || 'Chief Warden'}
-                        </span>
-                        <span className="text-xs text-slate-500">
-                            Administrator
-                        </span>
-                    </div>
-                    <button className="h-9 w-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 border border-indigo-200 overflow-hidden shrink-0 hover:ring-2 hover:ring-indigo-600/20 transition-all">
-                        {user?.avatar ? (
-                            <img src={user.avatar} alt="Profile" className="h-full w-full object-cover" />
-                        ) : (
-                            <User size={18} />
-                        )}
-                    </button>
-                </div>
+          <button
+            onClick={handleCreateNotice}
+            className="hidden sm:inline-flex h-10 items-center gap-2 rounded-xl bg-indigo-600 px-4 text-sm font-medium text-white shadow-sm transition-all hover:bg-indigo-700"
+          >
+            <Plus size={16} />
+            <span>Create Notice</span>
+          </button>
+
+          <button className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition-all hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900">
+            <Bell size={18} />
+          </button>
+
+          <button className="inline-flex items-center gap-3 rounded-2xl border border-slate-200 bg-white pl-2 pr-3 py-1.5 shadow-sm transition-all hover:border-slate-300 hover:bg-slate-50">
+            <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700">
+              {user?.avatar ? (
+                <img
+                  src={user.avatar}
+                  alt="Profile"
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <User size={18} />
+              )}
             </div>
-        </header>
-    );
+
+            <div className="hidden text-left lg:block">
+              <p className="text-sm font-semibold leading-tight text-slate-900">
+                {user?.name || 'Hostello Admin'}
+              </p>
+              <p className="text-xs text-slate-500">Administrator</p>
+            </div>
+
+            <ChevronDown size={16} className="hidden text-slate-400 lg:block" />
+          </button>
+        </div>
+      </div>
+    </header>
+  );
 };
 
 export default AdminHeader;
